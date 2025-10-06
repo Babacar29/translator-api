@@ -8,7 +8,7 @@
       { "src": "api/*.py", "use": "@vercel/python" }
     ],
     "routes": [
-      { "src": "/(.*)", "dest": "/api/main.py" }
+      { "src": "/(.*)", "dest": "/api/translate.py" }
     ]
   }
   
