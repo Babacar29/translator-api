@@ -1,35 +1,41 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import os
+import httpx
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from dotenv import load_dotenv
+
+# Charger les variables depuis le fichier .env
+load_dotenv()
 
 app = FastAPI()
 
-# CORS for browser requests (dev-friendly: allow all; tighten in production)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],  # includes OPTIONS preflight
-    allow_headers=["*"]
-)
-
-# Charger le modèle depuis Hugging Face
-model_name = "bilalfaye/nllb-200-distilled-600M-wo-fr-en"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-
-class TranslationRequest(BaseModel):
-    text: str
-    source_lang: str
-    target_lang: str
+HF_API_URL = os.getenv("HF_API_URL")
+HF_API_KEY = os.getenv("HF_API_KEY")
 
 @app.post("/translate")
-async def translate(req: TranslationRequest):
-    inputs = tokenizer(req.text, return_tensors="pt")
-    generated_tokens = model.generate(
-        **inputs,
-        forced_bos_token_id=tokenizer.convert_tokens_to_ids(req.target_lang)
-    )
-    translated_text = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
-    return {"translated": translated_text}
+async def translate(request: Request):
+    body = await request.json()
+    text = body.get("text", "")
+    target_lang = body.get("target_lang", "wol_Latn")
+
+    if not text:
+        return JSONResponse({"error": "Le champ 'text' est requis"}, status_code=400)
+
+    headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+    payload = {
+        "inputs": text,
+        "parameters": {
+            # Exemple : wol_Latn, fra_Latn, eng_Latn
+            "forced_bos_token_id": target_lang
+        }
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(HF_API_URL, headers=headers, json=payload)
+        data = response.json()
+
+    if isinstance(data, list) and "generated_text" in data[0]:
+        translation = data[0]["generated_text"]
+        return JSONResponse({"translated": translation})
+    else:
+        return JSONResponse({"error": data}, status_code=500)
