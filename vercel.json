@@ -1,0 +1,15 @@
+{
+    "builds": [
+      {
+        "src": "api/translate.py",
+        "use": "@vercel/python"
+      }
+    ],
+    "routes": [
+      {
+        "src": "/translate",
+        "dest": "/api/translate.py"
+      }
+    ]
+  }
+  
