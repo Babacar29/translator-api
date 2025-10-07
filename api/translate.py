@@ -32,10 +32,19 @@ async def translate(request: Request):
 
     async with httpx.AsyncClient() as client:
         response = await client.post(HF_API_URL, headers=headers, json=payload)
-        data = response.json()
+        # Try to parse JSON from the upstream response. If that fails,
+        # fall back to the raw text so we can return a useful error payload
+        try:
+            data = response.json()
+        except Exception:
+            # response.content may be bytes; use .text for a string fallback
+            data = response.text
 
-    if isinstance(data, list) and "generated_text" in data[0]:
+    # If the upstream returned a successful JSON list with generated_text, use it
+    if response.status_code == 200 and isinstance(data, list) and "generated_text" in data[0]:
         translation = data[0]["generated_text"]
         return JSONResponse({"translated": translation})
-    else:
-        return JSONResponse({"error": data}, status_code=500)
+
+    # Otherwise return a helpful error payload including upstream status and body
+    status = response.status_code if isinstance(response.status_code, int) else 500
+    return JSONResponse({"error": data, "upstream_status": status}, status_code=max(status, 500))
