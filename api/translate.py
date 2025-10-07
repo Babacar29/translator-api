@@ -12,7 +12,7 @@ app = FastAPI()
 HF_API_URL = os.getenv("HF_API_URL")
 HF_API_KEY = os.getenv("HF_API_KEY")
 
-@app.post("/translate")
+@app.post("/api/translate")
 async def translate(request: Request):
     body = await request.json()
     text = body.get("text", "")
